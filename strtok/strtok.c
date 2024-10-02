@@ -3,9 +3,11 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <time.h> // Incluir para medir el tiempo
 
 #define MAX 100 // Máxima longitud de una línea
-#define THREAD_COUNT 2 // Número de hilos
+#define THREAD_COUNT 8
+ // Número de hilos
 
 // Semáforos para controlar el acceso
 sem_t sems[THREAD_COUNT];
@@ -96,7 +98,8 @@ void* Tokenize(void* rank) {
         printf("Thread %ld > my line = %s", my_rank, my_line);
         count = 0;
 
-        // Tokenizar la línea usando strtok_mio
+        // Medir el tiempo de ejecución de strtok_mio
+        clock_t start = clock(); // Iniciar el temporizador
         my_string = strtok_mio(my_line, " \t\n", &saveptr);
 
         while (my_string != NULL) {
@@ -104,6 +107,11 @@ void* Tokenize(void* rank) {
             printf("Thread %ld > string %d = %s\n", my_rank, count, my_string);
             my_string = strtok_mio(NULL, " \t\n", &saveptr); // Obtener el siguiente token
         }
+        clock_t end = clock(); // Finalizar el temporizador
+
+        // Calcular y mostrar el tiempo de ejecución
+        double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        printf("Thread %ld > Time taken for strtok_mio: %f seconds\n", my_rank, cpu_time_used);
 
         // Notificar al siguiente hilo
         sem_post(&sems[(my_rank + 1) % THREAD_COUNT]);
