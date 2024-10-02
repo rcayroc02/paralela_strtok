@@ -3,12 +3,14 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <time.h> // Para medir el tiempo
 
 #define MAX 100 // Máxima longitud de una línea
-#define THREAD_COUNT 2 // Número de hilos
+#define THREAD_COUNT 8 // Número de hilos
 
 // Semáforos para controlar el acceso
 sem_t sems[THREAD_COUNT];
+double total_time[THREAD_COUNT] = {0}; // Array para almacenar el tiempo de cada hilo
 
 // Prototipo de la función Tokenize
 void* Tokenize(void* rank);
@@ -69,6 +71,13 @@ int main() {
         pthread_join(threads[thread_rank], NULL);
     }
 
+    // Calcular y mostrar el tiempo total
+    double total_execution_time = 0.0;
+    for (int i = 0; i < THREAD_COUNT; i++) {
+        total_execution_time += total_time[i];
+    }
+    printf("Total execution time: %.5f seconds\n", total_execution_time);
+
     // Destruir semáforos
     for (int i = 0; i < THREAD_COUNT; i++) {
         sem_destroy(&sems[i]);
@@ -98,6 +107,10 @@ void* Tokenize(void* rank) {
         printf("Thread %ld > my line = %s", my_rank, my_line);
         count = 0;
 
+        // Medir el tiempo antes de llamar a strtok_mio
+        struct timespec start, end;
+        clock_gettime(CLOCK_MONOTONIC, &start); // Obtiene el tiempo actual
+
         // Tokenizar la línea usando strtok_mio
         my_string = strtok_mio(my_line, " \t\n");
 
@@ -106,6 +119,18 @@ void* Tokenize(void* rank) {
             printf("Thread %ld > string %d = %s\n", my_rank, count, my_string);
             my_string = strtok_mio(NULL, " \t\n"); // Obtener el siguiente token
         }
+
+        // Medir el tiempo después de llamar a strtok_mio
+        clock_gettime(CLOCK_MONOTONIC, &end); // Obtiene el tiempo actual
+
+        // Calcular la duración en segundos
+        double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+
+        // Almacenar el tiempo de ejecución del hilo
+        total_time[my_rank] = elapsed;
+
+        // Imprimir el tiempo de ejecución
+        printf("Thread %ld > strtok_mio took %.5f seconds\n", my_rank, elapsed);
 
         // Notificar al siguiente hilo
         sem_post(&sems[(my_rank + 1) % THREAD_COUNT]);
